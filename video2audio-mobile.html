@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Video2Audio</title>
+
+  <!-- PWA support -->
+  <link rel="manifest" href="manifest.json" />
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js')
+        .then(reg => console.log("SW registered", reg))
+        .catch(err => console.error("SW failed", err));
+    }
+  </script>
+
+  <style>
+    body {
+      background-color: #000;
+      color: #eee;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 20px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .logo-wrapper {
+      position: fixed;
+      top: 10px;
+      right: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      user-select: none;
+    }
+
+    .logo-wrapper svg polygon {
+      fill: #3b82f6;
+    }
+
+    .logo-wrapper text {
+      fill: #3b82f6;
+      font-weight: 700;
+      font-family: 'Poppins', sans-serif;
+      font-size: 24px;
+    }
+
+    h1 {
+      color: #3b82f6;
+      margin-top: 60px;
+    }
+
+    input[type="file"] {
+      background: #111;
+      border: 1px solid #3b82f6;
+      color: #3b82f6;
+      padding: 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      width: 280px;
+      margin-bottom: 15px;
+    }
+
+    button {
+      background-color: #3b82f6;
+      border: none;
+      color: white;
+      padding: 12px 24px;
+      font-size: 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      margin-top: 10px;
+      transition: background-color 0.3s ease;
+    }
+
+    button:hover:not(:disabled) {
+      background-color: #2563eb;
+    }
+
+    button:disabled {
+      background-color: #1e40af;
+      cursor: not-allowed;
+    }
+
+    audio {
+      margin-top: 20px;
+      width: 100%;
+      max-width: 400px;
+      border-radius: 8px;
+      background: #111;
+    }
+
+    #downloadLink {
+      display: inline-block;
+      margin-top: 15px;
+      background-color: #3b82f6;
+      color: white;
+      padding: 12px 30px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    #downloadLink:hover {
+      background-color: #2563eb;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Logo top-right -->
+  <div class="logo-wrapper" title="Video2Audio">
+    <svg width="50" height="40" viewBox="0 0 200 60" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="grad" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stop-color="#4facfe" />
+          <stop offset="100%" stop-color="#00f2fe" />
+        </linearGradient>
+      </defs>
+      <rect width="200" height="60" rx="15" ry="15" fill="url(#grad)" />
+      <polygon points="30,15 30,45 55,30" />
+      <text x="70" y="37">Video2Audio</text>
+    </svg>
+  </div>
+
+  <h1>🎵 Convert Video to Audio</h1>
+
+  <input type="file" id="videoInput" accept="video/*" />
+  <button id="extractBtn" disabled>Extract & Download WAV</button>
+
+  <audio id="audioPlayer" controls style="display:none"></audio>
+  <a id="downloadLink" href="#" download style="display:none">⬇️ Download Audio</a>
+
+  <script>
+    const videoInput = document.getElementById('videoInput');
+    const extractBtn = document.getElementById('extractBtn');
+    const audioPlayer = document.getElementById('audioPlayer');
+    const downloadLink = document.getElementById('downloadLink');
+    let audioBuffer;
+    let audioContext;
+
+    videoInput.addEventListener('change', () => {
+      extractBtn.disabled = videoInput.files.length === 0;
+      audioPlayer.style.display = 'none';
+      downloadLink.style.display = 'none';
+    });
+
+    extractBtn.addEventListener('click', async () => {
+      if (videoInput.files.length === 0) return;
+
+      const file = videoInput.files[0];
+      const arrayBuffer = await file.arrayBuffer();
+
+      if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      }
+
+      try {
+        audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+      } catch (err) {
+        alert('❌ Failed to extract audio. Try a different video format.');
+        return;
+      }
+
+      // Do NOT auto-play. Let user play from player.
+      const wavBlob = encodeWAV(audioBuffer);
+      const url = URL.createObjectURL(wavBlob);
+
+      audioPlayer.src = url;
+      audioPlayer.style.display = 'block';
+
+      downloadLink.href = url;
+      downloadLink.download = 'audio.wav';
+      downloadLink.style.display = 'inline-block';
+    });
+
+    function encodeWAV(audioBuffer) {
+      const numChannels = audioBuffer.numberOfChannels;
+      const sampleRate = audioBuffer.sampleRate;
+      const bitsPerSample = 16;
+
+      const samples = audioBuffer.getChannelData(0);
+      const bufferLength = samples.length * 2;
+      const buffer = new ArrayBuffer(44 + bufferLength);
+      const view = new DataView(buffer);
+
+      function writeString(view, offset, str) {
+        for (let i = 0; i < str.length; i++) {
+          view.setUint8(offset + i, str.charCodeAt(i));
+        }
+      }
+
+      let offset = 0;
+      writeString(view, offset, 'RIFF'); offset += 4;
+      view.setUint32(offset, 36 + bufferLength, true); offset += 4;
+      writeString(view, offset, 'WAVE'); offset += 4;
+      writeString(view, offset, 'fmt '); offset += 4;
+      view.setUint32(offset, 16, true); offset += 4;
+      view.setUint16(offset, 1, true); offset += 2;
+      view.setUint16(offset, numChannels, true); offset += 2;
+      view.setUint32(offset, sampleRate, true); offset += 4;
+      view.setUint32(offset, sampleRate * numChannels * bitsPerSample / 8, true); offset += 4;
+      view.setUint16(offset, numChannels * bitsPerSample / 8, true); offset += 2;
+      view.setUint16(offset, bitsPerSample, true); offset += 2;
+      writeString(view, offset, 'data'); offset += 4;
+      view.setUint32(offset, bufferLength, true); offset += 4;
+
+      for (let i = 0; i < samples.length; i++) {
+        const s = Math.max(-1, Math.min(1, samples[i]));
+        view.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+      }
+
+      return new Blob([view], { type: 'audio/wav' });
+    }
+  </script>
+</body>
+</html>
