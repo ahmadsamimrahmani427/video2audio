@@ -2,17 +2,19 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Video2Audio</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22white%22><path d=%22M9 3v12.26A4 4 0 1 0 11 19V8h4V3H9z%22/></svg>">
   <style>
     body {
-      background: #000;
+      background-color: #000;
       color: #eee;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      font-family: 'Segoe UI', sans-serif;
       margin: 0;
       padding: 20px;
-      text-align: center;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
 
     .logo-wrapper {
@@ -22,22 +24,23 @@
       display: flex;
       align-items: center;
       gap: 10px;
-      user-select: none;
+      cursor: default;
     }
-    .logo-icon {
-      width: 32px;
-      height: 32px;
+
+    .logo-wrapper svg polygon {
       fill: white;
     }
-    .logo-text {
-      color: white;
-      font-weight: bold;
+
+    .logo-wrapper text {
+      fill: white;
+      font-weight: 700;
+      font-family: 'Poppins', sans-serif;
       font-size: 20px;
     }
 
     h1 {
       color: #3b82f6;
-      margin-top: 70px;
+      margin-bottom: 25px;
     }
 
     input[type="file"] {
@@ -47,8 +50,8 @@
       padding: 10px;
       border-radius: 6px;
       cursor: pointer;
-      width: 260px;
-      margin-top: 20px;
+      width: 300px;
+      margin-bottom: 15px;
     }
 
     button {
@@ -59,16 +62,17 @@
       font-size: 16px;
       border-radius: 8px;
       cursor: pointer;
-      margin-top: 20px;
-      transition: background-color 0.3s ease;
+      margin-top: 10px;
     }
-    button:hover {
-      background-color: #2563eb;
+
+    button:disabled {
+      background-color: #1e40af;
+      cursor: not-allowed;
     }
 
     audio {
-      margin-top: 25px;
-      width: 90%;
+      margin-top: 20px;
+      width: 100%;
       max-width: 400px;
     }
 
@@ -81,8 +85,8 @@
       border-radius: 8px;
       text-decoration: none;
       font-weight: 600;
-      transition: background-color 0.3s ease;
     }
+
     #downloadLink:hover {
       background-color: #2563eb;
     }
@@ -90,23 +94,21 @@
 </head>
 <body>
 
-  <!-- لوگو سفید با آیکن موسیقی -->
-  <div class="logo-wrapper">
-    <svg class="logo-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-      <path d="M9 3v12.26A4 4 0 1 0 11 19V8h4V3H9z"/>
+  <!-- لوگو بالا سمت راست -->
+  <div class="logo-wrapper" title="Video2Audio">
+    <svg width="180" height="50" viewBox="0 0 200 60" xmlns="http://www.w3.org/2000/svg">
+      <polygon points="30,15 30,45 55,30" />
+      <text x="70" y="37">🎧 Video2Audio</text>
     </svg>
-    <span class="logo-text">Video2Audio</span>
   </div>
 
-  <h1>Video2Audio</h1>
+  <h1>🎧 Convert Video to Audio</h1>
 
   <input type="file" id="videoInput" accept="video/*" />
-  <br />
-  <button id="extractBtn">🎵 Extract Audio</button>
-  <br />
-  <audio id="audioPlayer" controls style="display:none;"></audio>
-  <br />
-  <a id="downloadLink" style="display:none;" download="extracted-audio.mp3">⬇️ Download</a>
+  <button id="extractBtn" disabled>Extract & Download Audio</button>
+
+  <audio id="audioPlayer" controls style="display:none"></audio>
+  <a id="downloadLink" href="#" download style="display:none">🎧 Download Audio</a>
 
   <script>
     const videoInput = document.getElementById('videoInput');
@@ -114,20 +116,90 @@
     const audioPlayer = document.getElementById('audioPlayer');
     const downloadLink = document.getElementById('downloadLink');
 
-    extractBtn.addEventListener('click', () => {
-      const file = videoInput.files[0];
-      if (!file) return alert('Please select a video file.');
+    let audioContext;
 
-      const url = URL.createObjectURL(file);
-
-      // استفاده از صدای فایل ویدیو
-      audioPlayer.src = url;
-      audioPlayer.style.display = 'block';
-
-      downloadLink.href = url;
-      downloadLink.style.display = 'inline-block';
+    videoInput.addEventListener('change', () => {
+      extractBtn.disabled = videoInput.files.length === 0;
+      audioPlayer.style.display = 'none';
+      downloadLink.style.display = 'none';
     });
-  </script>
 
+    extractBtn.addEventListener('click', async () => {
+      const file = videoInput.files[0];
+      const arrayBuffer = await file.arrayBuffer();
+
+      if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      }
+
+      try {
+        const decodedData = await audioContext.decodeAudioData(arrayBuffer);
+        const wavBlob = encodeWAV(decodedData);
+        const url = URL.createObjectURL(wavBlob);
+
+        audioPlayer.src = url;
+        audioPlayer.style.display = 'block';
+
+        downloadLink.href = url;
+        downloadLink.download = 'audio.wav';
+        downloadLink.style.display = 'inline-block';
+      } catch (e) {
+        alert('Error decoding audio. Try a different video file.');
+        console.error(e);
+      }
+    });
+
+    function encodeWAV(audioBuffer) {
+      const numChannels = audioBuffer.numberOfChannels;
+      const sampleRate = audioBuffer.sampleRate;
+      const format = 1; // PCM
+      const bitDepth = 16;
+
+      let result;
+      if (numChannels === 2) {
+        const left = audioBuffer.getChannelData(0);
+        const right = audioBuffer.getChannelData(1);
+        const interleaved = new Float32Array(left.length * 2);
+        for (let i = 0; i < left.length; i++) {
+          interleaved[i * 2] = left[i];
+          interleaved[i * 2 + 1] = right[i];
+        }
+        result = interleaved;
+      } else {
+        result = audioBuffer.getChannelData(0);
+      }
+
+      const buffer = new ArrayBuffer(44 + result.length * 2);
+      const view = new DataView(buffer);
+
+      function writeString(view, offset, str) {
+        for (let i = 0; i < str.length; i++) {
+          view.setUint8(offset + i, str.charCodeAt(i));
+        }
+      }
+
+      let offset = 0;
+      writeString(view, offset, 'RIFF'); offset += 4;
+      view.setUint32(offset, 36 + result.length * 2, true); offset += 4;
+      writeString(view, offset, 'WAVE'); offset += 4;
+      writeString(view, offset, 'fmt '); offset += 4;
+      view.setUint32(offset, 16, true); offset += 4;
+      view.setUint16(offset, format, true); offset += 2;
+      view.setUint16(offset, numChannels, true); offset += 2;
+      view.setUint32(offset, sampleRate, true); offset += 4;
+      view.setUint32(offset, sampleRate * numChannels * bitDepth / 8, true); offset += 4;
+      view.setUint16(offset, numChannels * bitDepth / 8, true); offset += 2;
+      view.setUint16(offset, bitDepth, true); offset += 2;
+      writeString(view, offset, 'data'); offset += 4;
+      view.setUint32(offset, result.length * 2, true); offset += 4;
+
+      for (let i = 0; i < result.length; i++, offset += 2) {
+        let s = Math.max(-1, Math.min(1, result[i]));
+        view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+      }
+
+      return new Blob([view], { type: 'audio/wav' });
+    }
+  </script>
 </body>
 </html>
