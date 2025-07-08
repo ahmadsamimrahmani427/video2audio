@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voxir - Text to Video Converter</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <header>
+        <h1>Voxir</h1>
+        <p>Text to Video Converter</p>
+    </header>
+    <main>
+        <section id="text-to-speech">
+            <h2>Text to Speech</h2>
+            <textarea id="tts-input" placeholder="Enter text to convert to speech..."></textarea>
+            <button id="tts-button"><span class="icon">🔊</span>Convert to Speech</button>
+            <audio id="tts-audio" controls hidden></audio>
+        </section>
+
+        <section id="image-to-speech">
+            <h2>Image to Speech</h2>
+            <input type="file" id="image-upload" accept="image/*">
+            <button id="image-to-speech-button"><span class="icon">🖼️</span>Convert Image to Speech</button>
+            <audio id="image-audio" controls hidden></audio>
+        </section>
+
+        <section id="text-to-video">
+            <h2>Text to Video</h2>
+            <textarea id="video-text-input" placeholder="Enter text for video narration and display..."></textarea>
+            <!-- Add more controls here for background, etc. later -->
+            <button id="text-to-video-button"><span class="icon">🎬</span>Convert to Video</button>
+            <div id="video-output">
+                <!-- Video player will be embedded here -->
+            </div>
+        </section>
+    </main>
+    <footer>
+        <p>&copy; 2023 Voxir</p>
+    </footer>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
